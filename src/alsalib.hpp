@@ -2,43 +2,44 @@
 #include <alsa/asoundlib.h>
 
 class PCM {
-	snd_pcm_uframes_t frames;
-	
-	
+	bool isopened = false;
 	_snd_pcm_format _format;
 	public:
 	snd_pcm_hw_params_t *params;
 	snd_pcm_t *pcm;
 		PCM() {}
 		PCM(std::string device, _snd_pcm_stream stream, int mode) {
-			snd_pcm_open(&pcm, device.c_str(), stream, mode);
+			if (int error = snd_pcm_open(&pcm, device.c_str(), stream, mode) < 0) throw	error;
 			snd_pcm_hw_params_malloc(&params);
 			snd_pcm_hw_params_any(pcm, params);
+			isopened = true;
 		}
 
 		~PCM() {
+			if (isopened) close();
 			snd_pcm_hw_params_free(params);
 		}
 		
-		int setAccess(_snd_pcm_access _access) {
-			return snd_pcm_hw_params_set_access(pcm, params, _access);
+		void setAccess(_snd_pcm_access _access) {
+			if (int error = snd_pcm_hw_params_set_access(pcm, params, _access) < 0) throw error;
 		}
 
-		int setFormat(_snd_pcm_format format) {
+		void setFormat(_snd_pcm_format format) {
 			_format = format;
-			return snd_pcm_hw_params_set_format(pcm, params, format);
+			if (int error = snd_pcm_hw_params_set_format(pcm, params, format) < 0) throw error;
 		}
 
-		int setChannels(int channels) {
-			return snd_pcm_hw_params_set_channels(pcm, params, channels);
+		void setChannels(int channels) {
+			if (int error = snd_pcm_hw_params_set_channels(pcm, params, channels) < 0) throw error;
 		}
 
-		int setRate(unsigned int rate, int dir) {
-			return snd_pcm_hw_params_set_rate_near(pcm, params, &rate, &dir);
+		void setRate(unsigned int rate) {
+			int dir;
+			if (int error = snd_pcm_hw_params_set_rate_near(pcm, params, &rate, &dir) < 0) throw error;
 		}
 
-		int paramsApply() {
-			return snd_pcm_hw_params(pcm, params);
+		void paramsApply() {
+			if (int error = snd_pcm_hw_params(pcm, params) < 0) throw error;
 		}
 
 		std::string getName() {
@@ -55,13 +56,16 @@ class PCM {
 			return tmp;
 		}
 
-		int getRate(int dir) {
+		int getRate() {
+			int dir;
 			unsigned int tmp;
 			snd_pcm_hw_params_get_rate(params, &tmp, &dir);
 			return tmp;
 		}
 
-		int getPeriod(int dir) {
+		int getPeriod() {
+			int dir;
+			snd_pcm_uframes_t frames;
 			snd_pcm_hw_params_get_period_size(params, &frames, &dir);
 			return frames;
 		}
@@ -70,31 +74,47 @@ class PCM {
 			return snd_pcm_format_width(_format);
 		}
 
-		int prepare() {
-			return snd_pcm_prepare(pcm);
+		void start() {
+			if (int error = snd_pcm_start(pcm) < 0) throw error;
 		}
 
-		int recover(int err, int silent) {
-			return snd_pcm_recover(pcm, err, silent);
+		void prepare() {
+			if (int error = snd_pcm_prepare(pcm) < 0) throw error;
 		}
 
-		int writei(char * buff, snd_pcm_uframes_t frames) {
+		void recover(int err, int silent) {
+			if (int error = snd_pcm_recover(pcm, err, silent) < 0) throw error;
+		}
+
+		int writei(const void * buff, snd_pcm_uframes_t frames) {
 			return snd_pcm_writei(pcm, buff, frames);
 		}
 
-		int readi(char * buff) {
+		int readi(void * buff, snd_pcm_uframes_t frames) {
 			return snd_pcm_readi(pcm, buff, frames);
 		}
 
-		int drain() {
-			return snd_pcm_drain(pcm);
+		int pause() {
+			return snd_pcm_pause(pcm, 1);
 		}
 
-		int drop() {
-			return snd_pcm_drop(pcm);
+		void drain() {
+			if (int error = snd_pcm_drain(pcm) < 0) throw error;
+
 		}
 
-		int close() {
-			return snd_pcm_close(pcm);
+		void drop() {
+			if (int error = snd_pcm_drop(pcm) < 0) throw error;
+		}
+
+		void close() {
+			isopened = false;
+			if (int error = snd_pcm_close(pcm) < 0) throw error;
+		}
+
+		void pcm_exit() {
+			drop();
+			close();
+			snd_pcm_hw_params_free(params);
 		}
 };
