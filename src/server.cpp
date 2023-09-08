@@ -5,8 +5,8 @@
 #include <vector>
 #include <csignal>
 #include "alsaLib.hpp"
-#include "../cpplibs/ssocket.hpp"
-#include "../cpplibs/libjson.hpp"
+#include "cpplibs/ssocket.hpp"
+#include "cpplibs/libjson.hpp"
 using namespace std;
 
 enum Mode {
