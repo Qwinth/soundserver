@@ -1,0 +1,3 @@
+[submodule "src/cpplibs"]
+	path = src/cpplibs
+	url = https://github.com/Qwinth/cpplibs
