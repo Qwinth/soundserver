@@ -1,9 +1,53 @@
+#pragma once
 #include <string>
+#include <vector>
 #include <alsa/asoundlib.h>
+#include <iostream>
+
+#pragma pack(push, 1)
+
+struct WAVHeader {
+    char chunkID[4];
+    int chunkSize;
+    char format[4];
+
+    char subchunk1ID[4];
+    int subchunk1Size;
+    short audioFormat;
+    short numChannels;
+    int sampleRate;
+    int byteRate;
+    short blockAlign;
+    short bitsPerSample;
+
+    char subchunk2ID[4];
+    int subchunk2Size;
+};
+
+#pragma pack(pop)
+
+enum Mode {
+    PLAY,
+    CAPTURE
+};
+
+_snd_pcm_format inttoformat(int i) {
+	switch (i)
+	{
+	case 16:
+		return SND_PCM_FORMAT_S16_LE;
+		break;
+	
+	default:
+		return SND_PCM_FORMAT_S32_LE;
+		break;
+	}
+}
 
 class PCM {
 	bool isopened = false;
 	_snd_pcm_format _format;
+
 	public:
 	snd_pcm_hw_params_t *params;
 	snd_pcm_t *pcm;
@@ -18,6 +62,21 @@ class PCM {
 		~PCM() {
 			if (isopened) close();
 			snd_pcm_hw_params_free(params);
+		}
+
+		void setup(std::string device, WAVHeader header, Mode mode) {
+			try{ open(device, (_snd_pcm_stream)mode, 0); } catch (int e) {  if (e == 1) try { open(cardlist().back(), (_snd_pcm_stream)mode, 0); } catch(int er) { std::cerr << snd_strerror(e) << std::endl; exit(er); } }
+			setAccess(SND_PCM_ACCESS_RW_INTERLEAVED);
+			setFormat(inttoformat(header.bitsPerSample));
+			setChannels(header.numChannels);
+			setRate(header.sampleRate);
+		}
+
+		void open(std::string device, _snd_pcm_stream stream, int mode) {
+			if (int error = snd_pcm_open(&pcm, device.c_str(), stream, mode) < 0) throw	error;
+			snd_pcm_hw_params_malloc(&params);
+			snd_pcm_hw_params_any(pcm, params);
+			isopened = true;
 		}
 		
 		void setAccess(_snd_pcm_access _access) {
@@ -34,8 +93,11 @@ class PCM {
 		}
 
 		void setRate(unsigned int rate) {
-			int dir;
-			if (int error = snd_pcm_hw_params_set_rate_near(pcm, params, &rate, &dir) < 0) throw error;
+			if (int error = snd_pcm_hw_params_set_rate_near(pcm, params, &rate, 0) < 0) throw error;
+		}
+
+		void setBufferSize(int size) {
+			if (int error = snd_pcm_hw_params_set_buffer_size(pcm, params, size) < 0) throw error;
 		}
 
 		void paramsApply() {
@@ -56,18 +118,22 @@ class PCM {
 			return tmp;
 		}
 
-		int getRate() {
-			int dir;
+		unsigned int getRate() {
 			unsigned int tmp;
-			snd_pcm_hw_params_get_rate(params, &tmp, &dir);
+			snd_pcm_hw_params_get_rate(params, &tmp, 0);
 			return tmp;
 		}
 
 		int getPeriod() {
-			int dir;
 			snd_pcm_uframes_t frames;
-			snd_pcm_hw_params_get_period_size(params, &frames, &dir);
+			snd_pcm_hw_params_get_period_size(params, &frames, 0);
 			return frames;
+		}
+
+		int getBufferSize() {
+			snd_pcm_uframes_t buf_size;
+			snd_pcm_hw_params_get_buffer_size(params, &buf_size);
+			return buf_size;
 		}
 
 		int getFormatWidth() {
@@ -98,6 +164,10 @@ class PCM {
 			return snd_pcm_pause(pcm, 1);
 		}
 
+		int bufferAvailable() {
+			return snd_pcm_avail(pcm);
+		}
+
 		void drain() {
 			if (int error = snd_pcm_drain(pcm) < 0) throw error;
 
@@ -116,5 +186,19 @@ class PCM {
 			drop();
 			close();
 			snd_pcm_hw_params_free(params);
+		}
+
+		std::vector<std::string> cardlist() {
+			std::vector<std::string> list;
+			int card = -1;
+
+			do {
+				snd_card_next(&card);
+				list.push_back("default:" + std::to_string(card));
+			} while (card != -1);
+
+			list.pop_back();
+
+			return list;
 		}
 };
