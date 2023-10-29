@@ -293,7 +293,7 @@ void listener() {
     sock.sbind("", 53765);
     sock.slisten(0);
 
-    while (true) thread(player, sock.saccept()).detach();
+    while (true) thread(player, sock.saccept().first).detach();
 
 }
 
@@ -312,5 +312,5 @@ int main(int argc, char** argv) {
 
     thread(listener).detach();
     
-    while (true) thread(manager, sock.saccept()).detach();
+    while (true) thread(manager, sock.saccept().first).detach();
 }
