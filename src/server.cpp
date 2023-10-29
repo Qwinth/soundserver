@@ -303,7 +303,7 @@ int main(int argc, char** argv) {
     parser.add_argument({.flag1 = "-D", .flag2 = "--default-device"});
     auto args = parser.parse();
 
-    globalDevice = (args["--default-device"].str != "false") ? args["--default-device"].str : "default";
+    globalDevice = (args["--default-device"].type != ANYNONE) ? args["--default-device"].str : "default";
 
     SSocket sock(AF_INET, SOCK_STREAM);
     sock.ssetsockopt(SOL_SOCKET, SO_REUSEADDR, 1);
