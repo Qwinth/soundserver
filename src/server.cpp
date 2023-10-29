@@ -80,7 +80,7 @@ void sighandler(int e) {
 }
 
 void player(SSocket client) {
-    string id = client.srecv(1024);
+    string id = client.srecv(1024).string;
 
     while (play_setup.find(id) == play_setup.end()) continue;
 
@@ -101,7 +101,7 @@ void player(SSocket client) {
 
     if (mode == PLAY) {
         while (true) {
-            recvdata wavdata = client.srecv_char(buff_size);
+            sockrecv_t wavdata = client.srecv(buff_size);
             client.ssend("ok");
 
             // if (stoi(netparams[1]) == 16) {
@@ -129,7 +129,7 @@ void player(SSocket client) {
                 while (play_status[id] == "PAUSED") { this_thread::sleep_for(1ms); }
             }
 
-            if (pcm.writei(wavdata.value, period) == -EPIPE) {
+            if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
                 cout << "xrun" << endl;
                 pcm.recover(-EPIPE, 1);
             }
@@ -170,10 +170,10 @@ void manager(SSocket sock) {
     play_status[id] = "NONE";
 
     cl_data cldata;
-    cldata.header = *((WAVHeader*)sock.srecv_char(44).value);
-    cldata.mode = (Mode)stoi(sock.srecv(1));
+    cldata.header = *((WAVHeader*)sock.srecv(44).buffer);
+    cldata.mode = (Mode)stoi(sock.srecv(1).string);
 
-    JsonNode params = json.parse(sock.srecv(1024));
+    JsonNode params = json.parse(sock.srecv(1024).string);
 
     play_setup[id] = cldata;
     sock.ssend(id);
@@ -184,7 +184,7 @@ void manager(SSocket sock) {
     cout << "Manager: connected user: " << id << endl;
 
     while (true) {
-        string data = sock.srecv(1024);
+        string data = sock.srecv(1024).string;
     
         if (data == "start") {
             play_status[id] = "RUNNING";
