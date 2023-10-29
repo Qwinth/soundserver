@@ -16,8 +16,6 @@ struct cl_data {
     WAVHeader header;
 };
 
-
-
 long double doubleTime() { return std::chrono::duration_cast<std::chrono::duration<long double>>(std::chrono::system_clock::now().time_since_epoch()).count(); }
 
 // vector<cl_data> play_buff;
