@@ -47,6 +47,7 @@ void player(SSocket client) {
     int period = pcm.getPeriod();
     size_t buff_size = period * play_setup[id].header.numChannels * (play_setup[id].header.bitsPerSample / 8);
     client.ssend(to_string(buff_size));
+    client.setblocking(false);
 
     if (mode == PLAY) {
         while (true) {
@@ -66,17 +67,19 @@ void player(SSocket client) {
             }
 
             sockrecv_t wavdata = client.srecv(buff_size);
-            client.ssend("ok");
+            
+            if (wavdata.length > 0) {
+                client.ssend("ok");
 
-            if (wavdata.length > 0)
                 if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
                     cout << "xrun" << endl;
                     pcm.recover(-EPIPE, 1);
                 }
+            }
         }
 
     } else if (mode == CAPTURE) {
-        char buff[buff_size];
+        char* buff = new char[buff_size];
 
         while (true) {
             if (play_status[id] == "STOPPED") {
@@ -100,6 +103,8 @@ void player(SSocket client) {
 
             client.ssend(buff, buff_size);
         }
+
+        delete[] buff;
     }
 
 }
