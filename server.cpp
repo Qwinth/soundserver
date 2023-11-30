@@ -18,59 +18,10 @@ struct cl_data {
 
 long double doubleTime() { return std::chrono::duration_cast<std::chrono::duration<long double>>(std::chrono::system_clock::now().time_since_epoch()).count(); }
 
-// vector<cl_data> play_buff;
 map<string, string> play_status;
 map<string, cl_data> play_setup;
 map<string, PCM*> pcms;
 string globalDevice;
-
-// void soundwriter() {
-//     PCM pcm("default", SND_PCM_STREAM_PLAYBACK, 0);
-//     pcm.setAccess(SND_PCM_ACCESS_RW_INTERLEAVED);
-//     pcm.setFormat(SND_PCM_FORMAT_S32_LE);
-//     pcm.setChannels(2);
-//     pcm.setRate(48000, 0);
-//     pcm.paramsApply();
-//     pcm.prepare();
-//     cl_data data;
-
-//     while (true) {
-//         if (!play_buff.empty()) {
-//             if (pcm.getState() == "SETUP") {
-//                 pcm.prepare();
-//             }
-
-//             data = play_buff[0];
-//             cout << play_status[data.id] << endl;
-//             if (play_status.find(data.id) != play_status.end()) {
-//                 // cout << play_status[data.id] << endl;
-//                 if (play_status[data.id] != "STOP") {
-                
-//                 // cout << "pcm writei" << endl;
-//                     if (pcm.writei(data.data, data.period) == -EPIPE) {
-//                         cout << "xrun" << endl;
-//                         pcm.prepare();
-//                     }
-
-//                     play_buff.erase(play_buff.begin());
-
-//                     if (play_status[data.id] != "STOP") {
-//                         play_status[data.id] = "PREPARED";
-//                     } //else {
-//                 //     cout << "Soundwriter: disconnected user: " << data.id << endl;
-//                 // }
-//                 }
-//             }
-//         } else {
-//             this_thread::sleep_for(1ms);
-//             // pcm.prepare();
-//         }
-
-//         if (play_status.empty()) {
-//             pcm.drop();
-//         }
-//     }
-// }
 
 void sighandler(int e) {
     for (auto i : pcms) i.second->pcm_exit();
@@ -99,20 +50,6 @@ void player(SSocket client) {
 
     if (mode == PLAY) {
         while (true) {
-            sockrecv_t wavdata = client.srecv(buff_size);
-            client.ssend("ok");
-
-            // if (stoi(netparams[1]) == 16) {
-            //     for(int i = 0; i < buff_size; i += sizeof(int16_t)) {
-            //         intbuff[i / sizeof(int16_t)] = *((int16_t*)&wavdata.value[i]);
-            //     }
-                
-            //     for(int i = 0; i < buff_size / sizeof(int16_t); i += 1) {
-            //         intbuff[i] = ((int32_t)intbuff[i]) << 16;
-            //     }
-                
-            // }
-
             if (play_status[id] == "STOPPED") {
                 pcm.drop();
                 pcm.close();
@@ -124,13 +61,18 @@ void player(SSocket client) {
             
             else if (play_status[id] == "PAUSED") {
                 pcm.pause();
+                cout << "paused1" << endl;
                 while (play_status[id] == "PAUSED") { this_thread::sleep_for(1ms); }
             }
 
-            if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
-                cout << "xrun" << endl;
-                pcm.recover(-EPIPE, 1);
-            }
+            sockrecv_t wavdata = client.srecv(buff_size);
+            client.ssend("ok");
+
+            if (wavdata.length > 0)
+                if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
+                    cout << "xrun" << endl;
+                    pcm.recover(-EPIPE, 1);
+                }
         }
 
     } else if (mode == CAPTURE) {
@@ -188,6 +130,7 @@ void manager(SSocket sock) {
             play_status[id] = "RUNNING";
             start = doubleTime();
         } else if (data == "pause") {
+            cout << "paused" << endl;
             play_status[id] = "PAUSED";
         } else if (data == "stop" || data.length() == 0) {
             // cout << pcms[id]->bufferAvailable() << endl;
@@ -204,87 +147,11 @@ void manager(SSocket sock) {
             errno = preverrno;
         }
     }
+
     sock.sclose();
     cout << "Manager: disconnected user: " << id << endl;
 }
 
-// void handler(SSocket sock) {
-//     int err;
-//     string recv = sock.srecv(1024);
-//     vector<string> netparams = split(recv, ";");
-//     if (netparams.size() < 3) {
-//         sock.sclose();
-//         return;
-//     }
-//     _snd_pcm_format format;
-//     switch (stoi(netparams[0]))
-//     {
-//     case 16:
-//         format = SND_PCM_FORMAT_S16_LE;
-//         break;
-    
-//     case 32:
-//         format = SND_PCM_FORMAT_S32_LE;
-//         break;
-    
-//     case 64:
-//         format = SND_PCM_FORMAT_FLOAT64_LE;
-//         break;
-    
-//     default:
-//         format = SND_PCM_FORMAT_S16_LE;
-//         break;
-//     }
-    
-//     int rate = stoi(netparams[1]);
-//     int channels = stoi(netparams[2]);
-//     PCM pcm("default", SND_PCM_STREAM_PLAYBACK, 0);
-//     pcm.setAccess(SND_PCM_ACCESS_RW_INTERLEAVED);
-//     pcm.setFormat(format);
-//     pcm.setChannels(channels);
-//     pcm.setRate(rate, 0);
-//     pcm.paramsApply();
-
-//     int period = pcm.getPeriod(0);
-//     int buff_size = period * channels * pcm.getFormatWidth() / 8;
-
-//     recvdata data;
-//     // data.value = (char*)alloca(buff_size);
-//     // data.value = {0};
-//     // vector<char*> buff = {};
-//     sock.ssend(to_string(buff_size));
-//     // for (int i = 0; i < 4096; i++) {
-//     //     data = sock.srecv_char(buff_size);
-//     //     buff.push_back(data.value);
-//     //     sock.ssend(to_string(buff_size));
-//     // }
-
-//     while (true) {
-//         data = sock.srecv_char(buff_size);
-        
-//         while (err = pcm.writei(data.value, period) == -EPIPE) {
-//         pcm.prepare();
-//         }
-
-//         if (data.length == 0) {
-//             pcm.drop();
-//             break;
-//         }
-//         else if (data.length < buff_size) {
-//             pcm.drain();
-//             break;
-//         }
-        
-//         if (err < 0) {
-//         break;
-//         }
-//         sock.ssend(to_string(buff_size));
-//     }
-//     sock.ssend("exit");
-//     pcm.close();
-//     sock.sclose();
-    
-// }
 void listener() {
     SSocket sock(AF_INET, SOCK_STREAM);
     sock.ssetsockopt(SOL_SOCKET, SO_REUSEADDR, 1);

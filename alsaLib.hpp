@@ -153,15 +153,21 @@ class PCM {
 	}
 
 	int writei(const void * buff, snd_pcm_uframes_t frames) {
+		if (getState() == "PAUSED") resume();
 		return snd_pcm_writei(pcm, buff, frames);
 	}
 
 	int readi(void * buff, snd_pcm_uframes_t frames) {
+		if (getState() == "PAUSED") resume();
 		return snd_pcm_readi(pcm, buff, frames);
 	}
 
 	int pause() {
 		return snd_pcm_pause(pcm, 1);
+	}
+
+	int resume() {
+		return snd_pcm_pause(pcm, 0);
 	}
 
 	int bufferAvailable() {
