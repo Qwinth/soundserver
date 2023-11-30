@@ -53,7 +53,7 @@ class PCM {
 	snd_pcm_t *pcm;
 	PCM() {}
 	PCM(std::string device, _snd_pcm_stream stream, int mode) {
-		if (int error = snd_pcm_open(&pcm, device.c_str(), stream, mode) < 0) throw	error;
+		open(device, stream, mode);
 		snd_pcm_hw_params_malloc(&params);
 		snd_pcm_hw_params_any(pcm, params);
 		isopened = true;
