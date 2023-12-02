@@ -51,6 +51,11 @@ void player(SSocket client) {
 
     if (mode == PLAY) {
         while (true) {
+            if (play_status[id] == "PAUSED") {
+                pcm.pause();
+                while (play_status[id] == "PAUSED") { this_thread::sleep_for(5ms); }
+            }
+
             if (play_status[id] == "STOPPED") {
                 pcm.drop();
                 pcm.close();
@@ -58,12 +63,6 @@ void player(SSocket client) {
                 pcms.erase(id);
                 cout << "Player: disconnected user: " << id << endl;
                 break;
-            }
-            
-            else if (play_status[id] == "PAUSED") {
-                pcm.pause();
-                cout << "paused1" << endl;
-                while (play_status[id] == "PAUSED") { this_thread::sleep_for(1ms); }
             }
 
             sockrecv_t wavdata = client.srecv(buff_size);
@@ -82,6 +81,12 @@ void player(SSocket client) {
         char* buff = new char[buff_size];
 
         while (true) {
+            if (play_status[id] == "PAUSED") {
+                pcm.pause();
+                while (play_status[id] == "PAUSED") { this_thread::sleep_for(5ms); }
+                pcm.resume();
+            }
+
             if (play_status[id] == "STOPPED") {
                 pcm.drop();
                 pcm.close();
@@ -89,11 +94,6 @@ void player(SSocket client) {
                 pcms.erase(id);
                 cout << "Player: disconnected user: " << id << endl;
                 break;
-            }
-
-            else if (play_status[id] == "PAUSED") {
-                pcm.pause();
-                while (play_status[id] == "PAUSED") { this_thread::sleep_for(1ms); }
             }
 
             if (pcm.readi(buff, period) == -EPIPE) {
@@ -125,29 +125,45 @@ void manager(SSocket sock) {
 
     long double start = 0;
     long double duration = (long double)(cldata.header.subchunk2Size / (cldata.header.numChannels * (cldata.header.bitsPerSample / 8))) / (long double)cldata.header.sampleRate;
+    long double pause_time_start = 0;
+    long double pause_time = 0;
 
     cout << "Manager: connected user: " << id << endl;
 
     while (true) {
         string data = sock.srecv(1024).string;
-    
+
         if (data == "start") {
             play_status[id] = "RUNNING";
             start = doubleTime();
-        } else if (data == "pause") {
-            cout << "paused" << endl;
+        }
+        
+        else if (data == "pause") {
+            // cout << "paused" << endl;
             play_status[id] = "PAUSED";
-        } else if (data == "stop" || data.length() == 0) {
+            pause_time_start = doubleTime();
+        }
+        
+        else if (data == "resume") {
+            // cout << "resume" << endl;
+            play_status[id] = "RUNNING";
+            pause_time += doubleTime() - pause_time_start;
+            sock.ssend("0");
+        }
+        
+        else if (data == "stop" || data.length() == 0) {
             // cout << pcms[id]->bufferAvailable() << endl;
             play_status[id] = "STOPPED";
             break;
-        } else if (data == "is_running") {
+        }
+        
+        else if (data == "is_running") {
             int preverrno = errno;
 
             if (params["check_is_running"].str == "use_buffer_experimental") {
                 int frames = pcms[id]->bufferAvailable();
                 sock.ssend((frames >= pcms[id]->getBufferSize() - 100 || frames < 0) ? "0" : "1");
-            } else if (params["check_is_running"].str == "use_timer") sock.ssend((doubleTime() - start >= duration) ? "0" : "1");
+            } else if (params["check_is_running"].str == "use_timer") sock.ssend((doubleTime() - start >= duration + pause_time) ? "0" : "1");
 
             errno = preverrno;
         }
