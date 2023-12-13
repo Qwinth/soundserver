@@ -12,7 +12,7 @@
 using namespace std;
 
 struct cl_data {
-    Mode mode;
+    pcmmode_t mode;
     WAVHeader header;
 };
 
@@ -34,7 +34,7 @@ void player(SSocket client) {
 
     while (play_setup.find(id) == play_setup.end()) continue;
 
-    Mode mode = play_setup[id].mode;
+    pcmmode_t mode = play_setup[id].mode;
     cout << "Player: connected user: " << id << endl;
 
     PCM pcm;
@@ -117,7 +117,7 @@ void manager(SSocket sock) {
 
     cl_data cldata;
     cldata.header = *((WAVHeader*)sock.srecv(44).buffer);
-    cldata.mode = (Mode)stoi(sock.srecv(1).string);
+    cldata.mode = (pcmmode_t)stoi(sock.srecv(1).string);
 
     // JsonNode params = json.parse(sock.srecv(1024).string);
 
@@ -169,7 +169,10 @@ void manager(SSocket sock) {
         //     errno = preverrno;
         // }
 
-        else if (data == "get_sound_progress") sock.ssend(to_string((int)math_map(doubleTime(), start + pause_time, start + duration + pause_time, 0, 100)));
+        else if (data == "get_sound_progress") {
+            if (cldata.mode == PLAY) sock.ssend(to_string((int)math_map(doubleTime(), start + pause_time, start + duration + pause_time, 0, 100)));
+            else sock.ssend("0");
+        }
     }
 
     sock.sclose();

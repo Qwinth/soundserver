@@ -5,7 +5,7 @@
 #include <iostream>
 #include "wavheader.hpp"
 
-enum Mode {
+enum pcmmode_t {
     PLAY,
     CAPTURE
 };
@@ -43,7 +43,7 @@ class PCM {
 		snd_pcm_hw_params_free(params);
 	}
 
-	void setup(std::string device, WAVHeader header, Mode mode) {
+	void setup(std::string device, WAVHeader header, pcmmode_t mode) {
 		try{ open(device, (_snd_pcm_stream)mode, 0); } catch (int e) {  if (e == 1) try { open(cardlist().back(), (_snd_pcm_stream)mode, 0); } catch(int er) { std::cerr << snd_strerror(e) << std::endl; exit(er); } }
 		setAccess(SND_PCM_ACCESS_RW_INTERLEAVED);
 		setFormat(inttoformat(header.bitsPerSample));
