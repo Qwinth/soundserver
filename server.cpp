@@ -1,3 +1,4 @@
+// version 1.4
 #include <iostream>
 #include <string>
 #include <thread>
@@ -7,7 +8,6 @@
 #include <csignal>
 #include "alsaLib.hpp"
 #include "cpplibs/ssocket.hpp"
-#include "cpplibs/libjson.hpp"
 #include "cpplibs/argparse.hpp"
 using namespace std;
 
@@ -17,6 +17,7 @@ struct cl_data {
 };
 
 long double doubleTime() { return std::chrono::duration_cast<std::chrono::duration<long double>>(std::chrono::system_clock::now().time_since_epoch()).count(); }
+long double math_map(long double x, long double in_min, long double in_max, long double out_min, long double out_max) { return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min; }
 
 map<string, string> play_status;
 map<string, cl_data> play_setup;
@@ -110,7 +111,7 @@ void player(SSocket client) {
 }
 
 void manager(SSocket sock) {
-    Json json;
+    // Json json;
     string id = uuid4();
     play_status[id] = "NONE";
 
@@ -118,7 +119,7 @@ void manager(SSocket sock) {
     cldata.header = *((WAVHeader*)sock.srecv(44).buffer);
     cldata.mode = (Mode)stoi(sock.srecv(1).string);
 
-    JsonNode params = json.parse(sock.srecv(1024).string);
+    // JsonNode params = json.parse(sock.srecv(1024).string);
 
     play_setup[id] = cldata;
     sock.ssend(id);
@@ -157,16 +158,18 @@ void manager(SSocket sock) {
             break;
         }
         
-        else if (data == "is_running") {
-            int preverrno = errno;
+        // else if (data == "is_running") {
+        //     int preverrno = errno;
 
-            if (params["check_is_running"].str == "use_buffer_experimental") {
-                int frames = pcms[id]->bufferAvailable();
-                sock.ssend((frames >= pcms[id]->getBufferSize() - 100 || frames < 0) ? "0" : "1");
-            } else if (params["check_is_running"].str == "use_timer") sock.ssend((doubleTime() - start >= duration + pause_time) ? "0" : "1");
+        //     if (params["check_is_running"].str == "use_buffer_experimental") {
+        //         int frames = pcms[id]->bufferAvailable();
+        //         sock.ssend((frames >= pcms[id]->getBufferSize() - 100 || frames < 0) ? "0" : "1");
+        //     } else if (params["check_is_running"].str == "use_timer") sock.ssend((doubleTime() - start >= duration + pause_time) ? "0" : "1");
 
-            errno = preverrno;
-        }
+        //     errno = preverrno;
+        // }
+
+        else if (data == "get_sound_progress") sock.ssend(to_string((int)math_map(doubleTime(), start + pause_time, start + duration + pause_time, 0, 100)));
     }
 
     sock.sclose();
