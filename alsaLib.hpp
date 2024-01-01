@@ -13,7 +13,7 @@ enum pcmmode_t {
 _snd_pcm_format inttoformat(int i) {
 	switch (i) {
 		case 8: {
-			return SND_PCM_FORMAT_S8;
+			return SND_PCM_FORMAT_U8;
 		}
 
 		case 16: {
@@ -44,8 +44,7 @@ class PCM {
 	}
 
 	~PCM() {
-		if (isopened) close();
-		snd_pcm_hw_params_free(params);
+		pcm_exit();
 	}
 
 	void setup(std::string device, WAVHeader header, pcmmode_t mode) {
@@ -173,9 +172,12 @@ class PCM {
 	}
 
 	void pcm_exit() {
-		drop();
-		close();
-		snd_pcm_hw_params_free(params);
+		if (isopened) {
+			close();
+			snd_pcm_hw_params_free(params);
+		}
+
+		isopened = false;
 	}
 
 	std::vector<std::string> cardlist() {

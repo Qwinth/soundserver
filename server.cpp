@@ -1,4 +1,4 @@
-// version 1.4
+// version 1.5
 #include <iostream>
 #include <string>
 #include <thread>
@@ -38,7 +38,7 @@ void player(SSocket client) {
     cout << "Player: connected user: " << id << endl;
 
     PCM pcm;
-    pcm.setup(globalDevice, play_setup[id].header, mode);
+    try { pcm.setup(globalDevice, play_setup[id].header, mode); } catch (int e) { cerr << snd_strerror(e) << endl; pcm.pcm_exit(); client.sclose(); return; }
     try { pcm.setBufferSize(4096); } catch (int e) {};
     pcm.paramsApply();
     pcm.prepare();
