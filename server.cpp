@@ -39,7 +39,7 @@ void player(SSocket client) {
 
     PCM pcm;
     pcm.setup(globalDevice, play_setup[id].header, mode);
-    try { pcm.setBufferSize(65536); } catch (int e) {};
+    try { pcm.setBufferSize(4096); } catch (int e) {};
     pcm.paramsApply();
     pcm.prepare();
 
@@ -72,7 +72,6 @@ void player(SSocket client) {
                 client.ssend("ok");
 
                 if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
-                    cout << "xrun" << endl;
                     pcm.recover(-EPIPE, 1);
                 }
             }

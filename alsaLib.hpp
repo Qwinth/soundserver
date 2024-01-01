@@ -11,15 +11,20 @@ enum pcmmode_t {
 };
 
 _snd_pcm_format inttoformat(int i) {
-	switch (i)
-	{
-	case 16:
-		return SND_PCM_FORMAT_S16_LE;
-		break;
-	
-	default:
-		return SND_PCM_FORMAT_S32_LE;
-		break;
+	switch (i) {
+		case 8: {
+			return SND_PCM_FORMAT_S8;
+		}
+
+		case 16: {
+			return SND_PCM_FORMAT_S16_LE;
+			break;
+		}
+		
+		default: {
+			return SND_PCM_FORMAT_S32_LE;
+			break;
+		}
 	}
 }
 
