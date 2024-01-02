@@ -1,4 +1,5 @@
-// version 1.5
+// version 1.5.1
+// #define _DISABLE_HALF_RECV_LIMIT
 #include <iostream>
 #include <string>
 #include <thread>
@@ -39,7 +40,7 @@ void player(SSocket client) {
 
     PCM pcm;
     try { pcm.setup(globalDevice, play_setup[id].header, mode); } catch (int e) { cerr << snd_strerror(e) << endl; pcm.pcm_exit(); client.sclose(); return; }
-    try { pcm.setBufferSize(4096); } catch (int e) {};
+    try { pcm.setBufferSize(16384); } catch (int e) {};
     pcm.paramsApply();
     pcm.prepare();
 
@@ -195,6 +196,10 @@ int main(int argc, char** argv) {
     auto args = parser.parse();
 
     globalDevice = (args["--default-device"].type != ANYNONE) ? args["--default-device"].str : "default";
+
+    signal(SIGINT, sighandler);
+    signal(SIGTERM, sighandler);
+    signal(SIGKILL, sighandler);
 
     SSocket sock(AF_INET, SOCK_STREAM);
     sock.ssetsockopt(SOL_SOCKET, SO_REUSEADDR, 1);
