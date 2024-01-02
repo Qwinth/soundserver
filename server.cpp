@@ -40,9 +40,8 @@ void player(SSocket client) {
 
     PCM pcm;
     try { pcm.setup(globalDevice, play_setup[id].header, mode); } catch (int e) { cerr << snd_strerror(e) << endl; pcm.pcm_exit(); client.sclose(); return; }
-    try { pcm.setBufferSize(16384); } catch (int e) {};
+    try { pcm.setBufferSize(65536); } catch (int e) {};
     pcm.paramsApply();
-    pcm.prepare();
 
     pcms[id] = &pcm;
 
@@ -195,7 +194,7 @@ int main(int argc, char** argv) {
     parser.add_argument({.flag1 = "-D", .flag2 = "--default-device"});
     auto args = parser.parse();
 
-    globalDevice = (args["--default-device"].type != ANYNONE) ? args["--default-device"].str : "default";
+    globalDevice = (args["--default-device"].type != ANYNONE) ? args["--default-device"].str : "default"; // plughw:0,0
 
     signal(SIGINT, sighandler);
     signal(SIGTERM, sighandler);
