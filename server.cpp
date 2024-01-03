@@ -1,4 +1,4 @@
-// version 1.5.1
+// version 1.5.2
 // #define _DISABLE_HALF_RECV_LIMIT
 #include <iostream>
 #include <string>
@@ -39,74 +39,72 @@ void player(SSocket client) {
     cout << "Player: connected user: " << id << endl;
 
     PCM pcm;
-    try { pcm.setup(globalDevice, play_setup[id].header, mode); } catch (int e) { cerr << snd_strerror(e) << endl; pcm.pcm_exit(); client.sclose(); return; }
+    try { pcm.setup(globalDevice, play_setup[id].header, mode); } catch (int e) { cerr << snd_strerror(e) << endl; goto close_connection; }
     try { pcm.setBufferSize(65536); } catch (int e) {};
     pcm.paramsApply();
 
     pcms[id] = &pcm;
 
-    int period = pcm.getPeriod();
-    size_t buff_size = period * play_setup[id].header.numChannels * (play_setup[id].header.bitsPerSample / 8);
-    client.ssend(to_string(buff_size));
-    client.setblocking(false);
+    {
+        int period = pcm.getPeriod();
+        size_t buff_size = period * play_setup[id].header.numChannels * (play_setup[id].header.bitsPerSample / 8);
+        client.ssend(to_string(buff_size));
+        client.setblocking(false);
 
-    if (mode == PLAY) {
-        while (true) {
-            if (play_status[id] == "PAUSED") {
-                pcm.pause();
-                while (play_status[id] == "PAUSED") { this_thread::sleep_for(5ms); }
-            }
+        if (mode == PLAY) {
+            while (true) {
+                if (play_status[id] == "PAUSED") {
+                    pcm.pause();
+                    while (play_status[id] == "PAUSED") { this_thread::sleep_for(5ms); }
+                }
 
-            if (play_status[id] == "STOPPED") {
-                pcm.drop();
-                pcm.close();
-                client.sclose();
-                pcms.erase(id);
-                cout << "Player: disconnected user: " << id << endl;
-                break;
-            }
+                if (play_status[id] == "STOPPED") {
+                    pcm.close();
+                    break;
+                }
 
-            sockrecv_t wavdata = client.srecv(buff_size);
-            
-            if (wavdata.length > 0) {
-                client.ssend("ok");
+                sockrecv_t wavdata = client.srecv(buff_size);
+                
+                if (wavdata.length > 0) {
+                    client.ssend("ok");
 
-                if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
-                    pcm.recover(-EPIPE, 1);
+                    if (pcm.writei(wavdata.buffer, period) == -EPIPE) {
+                        pcm.recover(-EPIPE, 1);
+                    }
                 }
             }
         }
+        
+        else if (mode == CAPTURE) {
+            char* buff = new char[buff_size];
 
-    } else if (mode == CAPTURE) {
-        char* buff = new char[buff_size];
+            while (true) {
+                if (play_status[id] == "PAUSED") {
+                    pcm.pause();
+                    while (play_status[id] == "PAUSED") { this_thread::sleep_for(5ms); }
+                }
 
-        while (true) {
-            if (play_status[id] == "PAUSED") {
-                pcm.pause();
-                while (play_status[id] == "PAUSED") { this_thread::sleep_for(5ms); }
-                pcm.resume();
+                if (play_status[id] == "STOPPED") {
+                    pcm.close();
+                    break;
+                }
+
+                if (pcm.readi(buff, period) == -EPIPE) {
+                    pcm.recover(-EPIPE, 1);
+                }
+
+                client.ssend(buff, buff_size);
             }
 
-            if (play_status[id] == "STOPPED") {
-                pcm.drop();
-                pcm.close();
-                client.sclose();
-                pcms.erase(id);
-                cout << "Player: disconnected user: " << id << endl;
-                break;
-            }
-
-            if (pcm.readi(buff, period) == -EPIPE) {
-                cout << "xrun" << endl;
-                pcm.recover(-EPIPE, 1);
-            }
-
-            client.ssend(buff, buff_size);
+            delete[] buff;
         }
-
-        delete[] buff;
     }
 
+close_connection:
+    client.sclose();
+    pcms.erase(id);
+
+    cout << "Player: disconnected user: " << id << endl;
 }
 
 void manager(SSocket sock) {
@@ -191,10 +189,11 @@ void listener() {
 
 int main(int argc, char** argv) {
     ArgumentParser parser(argc, argv);
-    parser.add_argument({.flag1 = "-D", .flag2 = "--default-device"});
+    parser.add_argument({.flag1 = "-D", .flag2 = "--device"});
+    parser.add_argument({.flag1 = "-a", .flag2 = "--use-alsa", .without_value = true});
     auto args = parser.parse();
 
-    globalDevice = (args["--default-device"].type != ANYNONE) ? args["--default-device"].str : "default"; // plughw:0,0
+    globalDevice = (args["--device"].type != ANYNONE) ? args["--device"].str : (args["--use-alsa"].boolean) ? "plughw:0,0" : "default";
 
     signal(SIGINT, sighandler);
     signal(SIGTERM, sighandler);
